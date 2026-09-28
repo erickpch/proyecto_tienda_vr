@@ -317,34 +317,86 @@ export class ReportesRepository {
    * Catalogo para el asistente de compra: una fila por prenda con todos sus atributos,
    * el precio mas bajo con stock y las unidades en la sucursal pedida y en total.
    */
+  /**
+   * Catalogo para el asistente de compra: una fila por producto base (modelo) con las
+   * tallas y colores que tienen stock, el precio mas bajo, el precio por mayor y las
+   * unidades en la sucursal pedida y en total. `producto_id` es la variante con mas stock
+   * (en la sucursal si hay), para enlazar la tarjeta.
+   */
   catalogoParaAsistente(
     sucursalId?: number,
   ): Promise<Record<string, unknown>[]> {
     return this.dataSource.query(
-      `SELECT
-         p.id                                   AS id,
-         p.nombre                               AS nombre,
-         COALESCE(c.nombre, '')                 AS categoria,
-         COALESCE(cl.nombre, '')                AS coleccion,
-         COALESCE(co.nombre, '')                AS color,
-         COALESCE(t.nombre, '')                 AS talla,
-         COALESCE(tm.nombre, '')                AS temporada,
-         MIN(ps.precio)::text                   AS precio,
-         COALESCE(SUM(ps.cantidad - ps.cantidad_reservada)
-           FILTER (WHERE ps.sucursal_id = $1::int), 0)::int AS en_sucursal,
-         SUM(ps.cantidad - ps.cantidad_reservada)::int      AS en_total
-       FROM productos p
-       JOIN producto_sucursal ps ON ps.producto_id = p.id
-       LEFT JOIN categorias c ON c.id = p.categoria_id
-       LEFT JOIN colecciones cl ON cl.id = p.coleccion_id
-       LEFT JOIN colores co ON co.id = p.color_id
-       LEFT JOIN talla t ON t.id = p.talla_id
-       LEFT JOIN temporadas tm ON tm.id = p.temporada_id
-       WHERE ps.cantidad - ps.cantidad_reservada > 0
-       GROUP BY p.id, p.nombre, c.nombre, cl.nombre, co.nombre, t.nombre, tm.nombre
-       ORDER BY p.id
-       LIMIT 400`,
+      `WITH disponible AS (
+         SELECT p.id, p.modelo_id, p.color_id, p.talla_id,
+                ps.precio,
+                ps.cantidad - ps.cantidad_reservada AS unidades,
+                ps.sucursal_id
+           FROM productos p
+           JOIN producto_sucursal ps ON ps.producto_id = p.id
+          WHERE ps.cantidad - ps.cantidad_reservada > 0
+       )
+       SELECT
+         m.id                                                   AS modelo_id,
+         (SELECT d2.id FROM disponible d2
+           WHERE d2.modelo_id = m.id
+           ORDER BY (d2.sucursal_id = $1::int) DESC NULLS LAST, d2.unidades DESC
+           LIMIT 1)                                             AS producto_id,
+         m.nombre                                               AS nombre,
+         LEFT(COALESCE(m.descripcion, ''), 160)                 AS descripcion,
+         COALESCE(c.nombre, '')                                 AS categoria,
+         COALESCE(cl.nombre, '')                                AS coleccion,
+         COALESCE(tm.nombre, '')                                AS temporada,
+         string_agg(DISTINCT co.nombre, ', ')                   AS colores,
+         string_agg(DISTINCT t.nombre, ', ')                    AS tallas,
+         MIN(d.precio)::text                                    AS precio,
+         COALESCE(m.precio_mayor::text, '')                     AS precio_mayor,
+         m.minimo_mayor                                         AS minimo_mayor,
+         COALESCE(SUM(d.unidades) FILTER (WHERE d.sucursal_id = $1::int), 0)::int AS en_sucursal,
+         SUM(d.unidades)::int                                   AS en_total
+       FROM modelos m
+       JOIN disponible d ON d.modelo_id = m.id
+       LEFT JOIN categorias c ON c.id = m.categoria_id
+       LEFT JOIN colecciones cl ON cl.id = m.coleccion_id
+       LEFT JOIN temporadas tm ON tm.id = m.temporada_id
+       LEFT JOIN colores co ON co.id = d.color_id
+       LEFT JOIN talla t ON t.id = d.talla_id
+       GROUP BY m.id, m.nombre, m.descripcion, c.nombre, cl.nombre, tm.nombre, m.precio_mayor, m.minimo_mayor
+       ORDER BY m.id
+       LIMIT 300`,
       [sucursalId ?? null],
+    );
+  }
+
+  /** Sucursales con su ciudad, para contestar donde queda cada tienda. */
+  sucursalesParaAsistente(): Promise<Record<string, unknown>[]> {
+    return this.dataSource.query(
+      `SELECT s.nombre, COALESCE(s.ubicacion, '') AS ubicacion, c.nombre AS ciudad
+         FROM sucursales s
+         JOIN ciudades c ON c.id = s.ciudad_id
+        ORDER BY c.nombre, s.nombre`,
+    );
+  }
+
+  /** Tarifa de envio a domicilio por ciudad (nula = sin cobertura). */
+  tarifasDeEnvio(): Promise<{ ciudad: string; costo: string | null }[]> {
+    return this.dataSource.query(
+      `SELECT nombre AS ciudad, costo_envio::text AS costo FROM ciudades ORDER BY nombre`,
+    );
+  }
+
+  /** Promociones que estan corriendo hoy o empiezan en los proximos 30 dias. */
+  promocionesVigentes(): Promise<Record<string, unknown>[]> {
+    return this.dataSource.query(
+      `SELECT p.nombre, LEFT(COALESCE(p.descripcion, ''), 200) AS descripcion,
+              p.fecha_inicio::text AS desde, p.fecha_final::text AS hasta,
+              s.nombre AS sucursal
+         FROM promociones p
+         JOIN sucursales s ON s.id = p.sucursal_id
+        WHERE p.fecha_final >= CURRENT_DATE
+          AND p.fecha_inicio <= CURRENT_DATE + 30
+        ORDER BY p.fecha_inicio
+        LIMIT 30`,
     );
   }
 }
