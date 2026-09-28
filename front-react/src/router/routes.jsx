@@ -2,6 +2,8 @@ import { createBrowserRouter } from 'react-router'
 import { InicioPanel, RequireAuth, RequireRol, SoloInvitado } from './guards/guards'
 import Raiz from './Raiz'
 import {
+  AlmacenDetalle,
+  Almacenes,
   Bitacora,
   Catalogo,
   Catalogos,
@@ -15,12 +17,15 @@ import {
   Inicio,
   InventarioGlobal,
   Login,
+  MiCaja,
   MiPerfil,
+  ModeloForm,
   MisProductos,
   MisPedidos,
   MisReservas,
   NuevaReserva,
-  ProductoForm,
+  PedidoOnlineDetalle,
+  PedidosOnline,
   ProductosAdmin,
   PromocionesAdmin,
   PromocionesPublica,
@@ -31,13 +36,17 @@ import {
   ReportesVoz,
   ReservasSucursal,
   Roles,
+  Sincronizacion,
   SucursalesAdmin,
   SucursalesPublica,
   StockSucursal,
   SucursalForm,
   Tablero,
+  TicketLocal,
   TrabajadorForm,
   Trabajadores,
+  TurnoDetalle,
+  Turnos,
   Usuarios,
   VentaDetalleAdmin,
   VentasAdmin,
@@ -123,8 +132,8 @@ export const router = createBrowserRouter([
             element: <RequireRol roles={['administrador']} />,
             children: [
               { index: true, element: <ProductosAdmin /> },
-              { path: 'nuevo', element: <ProductoForm /> },
-              { path: ':id/editar', element: <ProductoForm /> },
+              { path: 'nuevo', element: <ModeloForm /> },
+              { path: ':id/editar', element: <ModeloForm /> },
             ],
           },
           {
@@ -132,12 +141,20 @@ export const router = createBrowserRouter([
             element: <RequireRol roles={['proveedor', 'administrador']} />,
             children: [
               { index: true, element: <MisProductos /> },
-              { path: 'nuevo', element: <ProductoForm /> },
-              { path: ':id/editar', element: <ProductoForm /> },
+              { path: 'nuevo', element: <ModeloForm /> },
+              { path: ':id/editar', element: <ModeloForm /> },
             ],
           },
           { path: 'inventario', element: conRol(['administrador'], <InventarioGlobal />) },
           { path: 'stock', element: conRol(['encargado', 'administrador'], <StockSucursal />) },
+          {
+            path: 'almacenes',
+            element: <RequireRol roles={['administrador', 'encargado']} />,
+            children: [
+              { index: true, element: <Almacenes /> },
+              { path: ':id', element: <AlmacenDetalle /> },
+            ],
+          },
 
           {
             path: 'promociones',
@@ -157,6 +174,14 @@ export const router = createBrowserRouter([
               { path: ':id', element: <VentaDetalleAdmin /> },
             ],
           },
+          {
+            path: 'pedidos',
+            element: <RequireRol roles={['administrador', 'encargado']} />,
+            children: [
+              { index: true, element: <PedidosOnline /> },
+              { path: ':id', element: <PedidoOnlineDetalle /> },
+            ],
+          },
           { path: 'ventas-sucursal', element: conRol(['encargado', 'administrador'], <VentasSucursal />) },
           { path: 'comprobantes', element: conRol(['administrador', 'encargado', 'cajero'], <Comprobantes />) },
 
@@ -165,7 +190,19 @@ export const router = createBrowserRouter([
             element: <RequireRol roles={['cajero', 'administrador']} />,
             children: [
               { index: true, element: <PuntoVenta /> },
+              { path: 'comprobante/local/:idCliente', element: <TicketLocal /> },
               { path: 'comprobante/:id', element: <ComprobanteTicket /> },
+            ],
+          },
+
+          { path: 'caja', element: conRol(['cajero', 'administrador'], <MiCaja />) },
+          { path: 'sincronizacion', element: conRol(['cajero', 'administrador'], <Sincronizacion />) },
+          {
+            path: 'turnos',
+            element: <RequireRol roles={['administrador', 'encargado', 'cajero']} />,
+            children: [
+              { index: true, element: <Turnos /> },
+              { path: ':id', element: <TurnoDetalle /> },
             ],
           },
 

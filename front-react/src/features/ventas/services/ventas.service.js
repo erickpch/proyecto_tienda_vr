@@ -17,8 +17,8 @@ export const ventasService = {
     return Promise.all(ids.map((id) => this.obtener(id)))
   },
 
-  crear(datos) {
-    return http.post('/ventas', datos)
+  crear(datos, opciones = {}) {
+    return http.post('/ventas', datos, opciones)
   },
 
   corregirTipo(id, tipo_venta) {

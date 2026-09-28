@@ -9,6 +9,7 @@ import {
   sucursalDeVenta,
   unidadesDeVenta,
 } from '@/features/ventas/ventas.utils'
+import { ESTADO_ENVIO, ETIQUETA_MODALIDAD } from '../envios.utils'
 import Skeleton from '@/shared/components/Skeleton'
 import EstadoVacio from '@/shared/components/EstadoVacio'
 import { monedaBs } from '@/shared/utils/moneda-bs'
@@ -129,10 +130,25 @@ export default function MisPedidos() {
                 <span className="text-on-surface-variant">
                   {unidades} {unidades === 1 ? 'producto' : 'productos'}
                 </span>
-                <span className="flex items-center gap-1 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[16px]">store</span>
-                  {sucursalDeVenta(v)?.nombre ?? '—'}
-                </span>
+                {v.envio ? (
+                  <>
+                    <span
+                      className={cx(
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                        ESTADO_ENVIO[v.envio.estado].chip,
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">{ESTADO_ENVIO[v.envio.estado].icono}</span>
+                      {ESTADO_ENVIO[v.envio.estado].etiqueta}
+                    </span>
+                    <span className="text-on-surface-variant">{ETIQUETA_MODALIDAD[v.envio.modalidad]}</span>
+                  </>
+                ) : (
+                  <span className="flex items-center gap-1 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[16px]">store</span>
+                    {sucursalDeVenta(v)?.nombre ?? '—'}
+                  </span>
+                )}
               </div>
               <div className="flex items-center justify-between gap-4 md:justify-end">
                 <span className="text-lg font-bold tabular-nums text-on-surface">{monedaBs(v.total)}</span>

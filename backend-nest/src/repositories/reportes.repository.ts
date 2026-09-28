@@ -22,7 +22,8 @@ export class ReportesRepository {
        FROM ventas v
        JOIN detalle_venta dv ON dv.venta_id = v.id
        JOIN producto_sucursal ps ON ps.id = dv.producto_sucursal_id
-       WHERE ($1::date IS NULL OR v.creada_en >= $1::date)
+       WHERE v.cancelada_en IS NULL
+         AND ($1::date IS NULL OR v.creada_en >= $1::date)
          AND ($2::date IS NULL OR v.creada_en < $2::date + INTERVAL '1 day')
          AND ($3::int IS NULL OR ps.sucursal_id = $3::int)`,
       [rango.desde ?? null, rango.hasta ?? null, rango.sucursal_id ?? null],
@@ -38,7 +39,8 @@ export class ReportesRepository {
        FROM ventas v
        JOIN detalle_venta dv ON dv.venta_id = v.id
        JOIN producto_sucursal ps ON ps.id = dv.producto_sucursal_id
-       WHERE ($1::date IS NULL OR v.creada_en >= $1::date)
+       WHERE v.cancelada_en IS NULL
+         AND ($1::date IS NULL OR v.creada_en >= $1::date)
          AND ($2::date IS NULL OR v.creada_en < $2::date + INTERVAL '1 day')
          AND ($3::int IS NULL OR ps.sucursal_id = $3::int)
        GROUP BY dia
@@ -63,7 +65,8 @@ export class ReportesRepository {
        JOIN producto_sucursal ps ON ps.id = dv.producto_sucursal_id
        JOIN productos p ON p.id = ps.producto_id
        LEFT JOIN categorias c ON c.id = p.categoria_id
-       WHERE ($1::date IS NULL OR v.creada_en >= $1::date)
+       WHERE v.cancelada_en IS NULL
+         AND ($1::date IS NULL OR v.creada_en >= $1::date)
          AND ($2::date IS NULL OR v.creada_en < $2::date + INTERVAL '1 day')
          AND ($3::int IS NULL OR ps.sucursal_id = $3::int)
        GROUP BY p.id, p.nombre, c.nombre
@@ -90,7 +93,8 @@ export class ReportesRepository {
        JOIN detalle_venta dv ON dv.venta_id = v.id
        JOIN producto_sucursal ps ON ps.id = dv.producto_sucursal_id
        JOIN sucursales s ON s.id = ps.sucursal_id
-       WHERE ($1::date IS NULL OR v.creada_en >= $1::date)
+       WHERE v.cancelada_en IS NULL
+         AND ($1::date IS NULL OR v.creada_en >= $1::date)
          AND ($2::date IS NULL OR v.creada_en < $2::date + INTERVAL '1 day')
          AND ($3::int IS NULL OR ps.sucursal_id = $3::int)
        GROUP BY s.id, s.nombre
@@ -223,13 +227,14 @@ export class ReportesRepository {
          COUNT(*) FILTER (WHERE v.creada_en >= date_trunc('month', CURRENT_DATE))::int
            AS ventas_mes
        FROM ventas v
-       WHERE $1::int IS NULL
+       WHERE v.cancelada_en IS NULL
+         AND ($1::int IS NULL
           OR EXISTS (
             SELECT 1
             FROM detalle_venta dv
             JOIN producto_sucursal ps ON ps.id = dv.producto_sucursal_id
             WHERE dv.venta_id = v.id AND ps.sucursal_id = $1::int
-          )`,
+          ))`,
       [sucursalId ?? null],
     );
   }
@@ -252,7 +257,7 @@ export class ReportesRepository {
        LEFT JOIN categorias c ON c.id = p.categoria_id
        LEFT JOIN talla t ON t.id = p.talla_id
        LEFT JOIN colores co ON co.id = p.color_id
-       WHERE v.usuario_id = $1
+       WHERE v.usuario_id = $1 AND v.cancelada_en IS NULL
        GROUP BY p.nombre, c.nombre, t.nombre, co.nombre
        ORDER BY unidades DESC
        LIMIT $2`,

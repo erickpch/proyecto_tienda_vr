@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router'
 import { ventasService } from '@/features/ventas/services/ventas.service'
 import { CHIP_TIPO, ETIQUETA_TIPO, fechaDeVenta, numeroVenta } from '@/features/ventas/ventas.utils'
 import ResumenVenta from '@/features/ventas/components/ResumenVenta'
+import SeguimientoEnvio from '../components/SeguimientoEnvio'
+import ModalCancelarPedido from '../components/ModalCancelarPedido'
 import Skeleton from '@/shared/components/Skeleton'
 import { monedaBs } from '@/shared/utils/moneda-bs'
 import { formatoFecha } from '@/shared/utils/formato'
@@ -14,6 +16,8 @@ export default function DetallePedido() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
   const [venta, setVenta] = useState(null)
+  const [cancelando, setCancelando] = useState(false)
+  const [version, setVersion] = useState(0)
 
   const [idCargado, setIdCargado] = useState(id)
   if (idCargado !== id) {
@@ -33,7 +37,7 @@ export default function DetallePedido() {
         setError(e.status === 404 || e.status === 403 ? 'No encontramos ese pedido entre los tuyos.' : e.message)
         setCargando(false)
       })
-  }, [id])
+  }, [id, version])
 
   const fecha = venta ? fechaDeVenta(venta) : null
 
@@ -71,7 +75,37 @@ export default function DetallePedido() {
           </div>
         </header>
 
+        {v.envio && (
+          <div className="mb-6">
+            <SeguimientoEnvio envio={v.envio} />
+            {v.envio.estado === 'pendiente' && (
+              <div className="no-imprimir mt-3 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
+                <span>Puedes cancelar mientras la tienda no empiece a prepararlo.</span>
+                <button
+                  type="button"
+                  className="btn-secundario border-error text-error hover:bg-error/5"
+                  onClick={() => setCancelando(true)}
+                >
+                  Cancelar pedido
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <ResumenVenta venta={v} fecha={fecha} />
+
+        {cancelando && (
+          <ModalCancelarPedido
+            envio={v.envio}
+            pagadoConTarjeta={Boolean(v.pago_id)}
+            onCerrar={() => setCancelando(false)}
+            onCancelado={() => {
+              setCancelando(false)
+              setVersion((n) => n + 1)
+            }}
+          />
+        )}
       </>
     )
   }

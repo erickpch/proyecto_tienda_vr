@@ -35,10 +35,11 @@ Reglas que no podes romper:
 
 /** Tablas que la IA puede consultar en los reportes libres. */
 const ESQUEMA = `Base PostgreSQL de la tienda. Tablas y columnas:
-- ventas(id, tipo_venta: 'virtual' | 'presencial', total numeric en Bs, pago_id, usuario_id -> usuarios.id (el comprador), creada_en timestamp)
-- detalle_venta(id, venta_id -> ventas.id, producto_sucursal_id -> producto_sucursal.id, cantidad int, precio numeric unitario en Bs)
+- ventas(id, tipo_venta: 'virtual' | 'presencial', modalidad: 'menor' | 'mayor' (venta por mayor si alguna linea se cobro con precio por mayor), total numeric en Bs, pago_id, metodo_pago: 'efectivo' | 'tarjeta' | 'qr' | 'contraentrega' (nulo en ventas viejas), estado_pago: 'pagado' | 'pendiente' | 'reembolsado', cancelada_en timestamp (nulo si no se cancelo), usuario_id -> usuarios.id (el comprador), turno_id -> turnos_caja.id (solo presenciales), creada_en timestamp)
+- detalle_venta(id, venta_id -> ventas.id, producto_sucursal_id -> producto_sucursal.id, cantidad int, precio numeric unitario cobrado en Bs, precio_lista numeric (precio por menor de ese momento; si es mayor que precio, la linea fue por mayor))
 - producto_sucursal(id, producto_id -> productos.id, sucursal_id -> sucursales.id, cantidad int (stock), cantidad_reservada int, precio numeric)
-- productos(id, nombre, precio, categoria_id -> categorias.id, coleccion_id -> colecciones.id, color_id -> colores.id, talla_id -> talla.id, temporada_id -> temporadas.id, proveedor_id -> proveedores.id)
+- modelos(id, nombre, descripcion, precio, precio_mayor, minimo_mayor, categoria_id, coleccion_id, temporada_id, proveedor_id): el producto base o diseno que ve el cliente
+- productos(id, modelo_id -> modelos.id, sku (codigo de la variante), nombre (modelo - color - talla), precio (por menor), precio_mayor (nulo si no se vende por mayor), minimo_mayor (prendas surtidas para acceder al precio por mayor), categoria_id -> categorias.id, coleccion_id -> colecciones.id, color_id -> colores.id, talla_id -> talla.id, temporada_id -> temporadas.id, proveedor_id -> proveedores.id)
 - categorias(id, nombre), colecciones(id, nombre, descripcion), colores(id, nombre), talla(id, nombre), temporadas(id, nombre)
 - proveedores(id, nombre, descripcion, encargado, telefono)
 - sucursales(id, nombre, ubicacion, ciudad_id -> ciudades.id), ciudades(id, nombre)
@@ -48,10 +49,23 @@ const ESQUEMA = `Base PostgreSQL de la tienda. Tablas y columnas:
 - reserva_sucursal(id, reserva_id -> reserva.id, producto_sucursal_id -> producto_sucursal.id, cantidad int)
 - promociones(id, nombre, descripcion, fecha_inicio, fecha_final, sucursal_id -> sucursales.id)
 - comprobantes(id, nombre, cantidad, monto, fecha, venta_id -> ventas.id)
+- turnos_caja(id, sucursal_id -> sucursales.id, cajero_id -> usuarios.id, monto_inicial, abierto_en timestamp, cerrado_en timestamp (nulo si sigue abierto), efectivo_esperado, efectivo_contado, diferencia (contado - esperado; negativo = faltante), observacion)
+- movimientos_caja(id, turno_id -> turnos_caja.id, tipo: 'ingreso' | 'egreso', monto, motivo, usuario_id -> usuarios.id, creado_en timestamp)
+- almacenes(id, nombre, ubicacion, ciudad_id -> ciudades.id)
+- producto_almacen(id, producto_id -> productos.id, almacen_id -> almacenes.id, cantidad int (stock en el almacen))
+- movimientos_almacen(id, tipo: 'ingreso' | 'envio' | 'devolucion', almacen_id -> almacenes.id, sucursal_id -> sucursales.id (destino del envio u origen de la devolucion; nulo en ingreso), usuario_id -> usuarios.id, observacion, creado_en timestamp)
+- detalle_movimiento_almacen(id, movimiento_id -> movimientos_almacen.id, producto_id -> productos.id, cantidad int)
+- envios(id, venta_id -> ventas.id, modalidad: 'retiro' | 'domicilio', estado: 'pendiente' | 'preparando' | 'en_camino' | 'listo_retiro' | 'entregado' | 'cancelado', sucursal_id -> sucursales.id (despacha), ciudad_id -> ciudades.id (destino), direccion, destinatario, telefono, costo numeric (envio en Bs), creado_en, entregado_en)
+- envio_eventos(id, envio_id -> envios.id, estado, nota, usuario_id -> usuarios.id, creado_en) historial de estados del pedido
+- ciudades.costo_envio: tarifa de envio a domicilio (nula = sin cobertura)
 Notas:
-- El importe vendido es SUM(detalle_venta.cantidad * detalle_venta.precio).
+- El importe vendido es SUM(detalle_venta.cantidad * detalle_venta.precio). ventas.total incluye ademas el costo de envio.
+- Excluye siempre las ventas canceladas (ventas.cancelada_en IS NULL) salvo que pregunten por cancelaciones.
 - La sucursal de una venta sale de detalle_venta -> producto_sucursal.sucursal_id.
-- El stock disponible es producto_sucursal.cantidad - producto_sucursal.cantidad_reservada.`;
+- El stock disponible es producto_sucursal.cantidad - producto_sucursal.cantidad_reservada.
+- Cada fila de productos es una variante (una talla en un color) de un modelo: para agrupar por prenda usa modelos.nombre via productos.modelo_id.
+- "Turno Y" se refiere a turnos_caja.id = Y; las ventas de un turno son ventas.turno_id = Y. El cajero del turno es usuarios.nombre/apellido via cajero_id.
+- El stock de los almacenes es aparte del de sucursales: esta en producto_almacen.`;
 
 const MAXIMO_FILAS_PARA_IA = 50;
 const MAXIMO_BARRAS = 20;

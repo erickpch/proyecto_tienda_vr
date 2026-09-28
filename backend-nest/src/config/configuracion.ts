@@ -46,6 +46,14 @@ export function configuracion() {
       consultasPorHora: numero(process.env.IA_CONSULTAS_POR_HORA, 30),
     },
 
+    envios: {
+      /** Pedidos contraentrega abiertos que puede tener un mismo cliente. */
+      contraentregaPendientesMax: numero(
+        process.env.CONTRAENTREGA_PENDIENTES_MAX,
+        2,
+      ),
+    },
+
     reservas: {
       horasVigencia: numero(process.env.RESERVA_HORAS_VIGENCIA, 24),
     },
